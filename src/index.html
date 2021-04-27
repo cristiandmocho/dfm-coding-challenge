@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DFM Systems Coding Challenge</title>
+
+    <link rel="stylesheet" href="css/bootstrap.min.css" />
+
+    <script src="js/libs/jquery-3.6.0.min.js"></script>
+    <script src="js/libs/bootstrap.min.js"></script>
+    <script src="js/libs/bootstrap.treeview.js"></script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>DFM Systems - Coding Challenge</h1>
+      <form>
+        <div class="mb-3">
+          <label for="unlockcode" class="form-label">Unlock Code</label>
+          <input type="text" class="form-control" id="unlockcode" aria-describedby="unlockCode" />
+          <div id="unlockCode" class="form-text">Please type in your unlock code.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </form>
+      <hr />
+      <div class="alert alert-danger fade show" role="alert">
+        <span></span>
+      </div>
+      <div id="treeview">
+        <h2 id="title"></h2>
+        <div id="content"></div>
+      </div>
+    </div>
+  </body>
+  <script>
+    const API_BASE_URL = 'https://dev.onlinedfm.com:8080';
+
+    // Making the request to the server
+    function validateUnlockCode(unlockcode) {
+      if (!unlockcode) return;
+
+      $.ajax(`${API_BASE_URL}/validatedunlockcode`, {
+        method: 'POST',
+        data: JSON.stringify({ unlockcode })
+      })
+        .then(mapResultData)
+        .catch(showErrorMessage);
+    }
+
+    // Showing error message if something goes wrong
+    function showErrorMessage(err) {
+      const errorMessage = err.responseJSON.errorStatusCode + ' - ' + err.responseJSON.errorDescription;
+      $('.alert span').text(errorMessage);
+      $('.alert').fadeIn(125);
+      $('#treeview').hide();
+
+      setTimeout(() => {
+        $('.alert').fadeOut(500);
+      }, 3000);
+    }
+
+    // Mapping the data to the correct format to show on a 'treeview'
+    function mapResultData(data) {
+      const result = [];
+      const title = data.projectInfo.name;
+      const folders = data.folders;
+
+      function findNode(id) {
+        for (const item of result) {
+          if (item.id === id) return item;
+          if (item.nodes) {
+            const node = item.nodes.find(node => node.id === id);
+            if (node) return node;
+          }
+        }
+
+        return null;
+      }
+
+      folders.forEach(item => {
+        if (!item.parentId || !folders.find(i => i.id === item.parentId)) {
+          // Parent Id doesn't exist? Then this item is a parent
+          result.push({ text: item.displayName, href: item.no, id: item.id });
+        } else {
+          // It's a child, find its parent
+          const node = findNode(item.parentId);
+
+          if (node) {
+            if (!node.nodes) node.nodes = [];
+            node.nodes.push({ text: item.displayName, href: item.no, id: item.id });
+          }
+        }
+      });
+
+      // Showing the tree
+      $('#treeview #content').treeview({
+        data: result,
+        levels: 4
+      });
+      $('#treeview #title').text(title);
+      $('#treeview').show();
+    }
+
+    // UI Events
+    $('.btn-primary').on('click', e => {
+      e.preventDefault();
+
+      validateUnlockCode($('#unlockcode').val());
+    });
+
+    // Initializing
+    $('.alert, #treeview').hide();
+  </script>
+</html>
